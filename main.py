@@ -13,6 +13,16 @@ from threading import Thread
 app = Flask(__name__)
 
 
+def conf_list():
+    """Returns a list of valid conference abbreviations."""
+    return ['ACC','B10','B12','P12','SEC','N16']
+
+
+def pos_list():
+    """Returns a list of valid positions"""
+    return ['QB','RB','TE','WR']
+
+
 @app.route('/top25', methods = ['GET','POST'])
 def top25():
     """Posts top 25 rankings"""
@@ -107,24 +117,15 @@ def grads():
         """Sends a delatyed response back to the channel the slash command was invoked from."""
 
         params = form.get('text')
-        
-        conf_list = [
-                'ACC',
-                'B10',
-                'B12',
-                'P12',
-                'SEC',
-                'N16'
-        ]
+        uparams = params.upper() if params is not None else None
 
-        conf = params if params in conf_list else None
-        rank_type = 'full' if params == 'full' else None
+        conf = uparams if uparams in conf_list() else None
         if conf is None: 
             conf_title = 'All Graduating Players'
             sheets_values = 'Graduating-All!A:E'
         else: 
             conf_title = '{} Graduating Players'.format(conf)
-            sheets_values = 'Graduating-{}!A:E'.format(conf)
+            sheets_values = 'Graduating-{}!A:F'.format(conf)
         
         sheet_id = '18HhjFkZ-Z7Iuafllkd8StHONbhdePcTQeKUTLFo3TrU'
         sheets_url = 'https://sheets.googleapis.com/v4/spreadsheets/{}/values/{}?key=AIzaSyD59KmdlMqgYpUcakIonO-yjaeg55D60hY'.format(sheet_id, sheets_values)
@@ -161,7 +162,7 @@ def grads():
                 fields.append(field_count)
                 count += 1
         else:
-            for conference,div,team,pos,player in results:
+            for conference,div,logo,team,pos,player in results:
                 if (count == 0):
                     field_team = {
                             'title': 'TEAM',
@@ -173,7 +174,7 @@ def grads():
                     }
                 else:
                     field_team = {
-                            'value': team,
+                            'value': '{} {}'.format(logo,team),
                             'short': 'true',
                     }
                     field_player = {
@@ -214,6 +215,102 @@ def grads():
     thread.start()
     return '',200
 
+
+@app.route('/topstarters', methods = ['GET','POST'])
+def top_starters():
+    """Returns the top starters from a given conference at a given position, based on career points while starting."""
+    def delayed_response(form):
+        """Sends a delayed response to the channel the slash command was invoked from."""
+
+        raw_params = form.get('text')
+        params = raw_params.split()
+
+        url = form.get('response_url')
+        user_id = form.get('user_id')
+        user_name = form.get('user_name')
+        channel_name = form.get('channel_name')
+
+
+        if len(params) != 2 or params[0].upper() not in conf_list() or params[1].upper() not in pos_list():
+            msg_text = 'Invalid usage: `/topstarters {}`. Please provide the conference and position group, e.g. `/topstarters ACC QB`'.format(raw_params)
+            json_body = {
+                'response_type': 'ephemeral',
+                'text': msg_text 
+            }
+        
+            r = requests.post(url, json = json_body)
+            print('User {} requested report for {} in channel {}'.format(user_name, 'Top Starters', channel_name))
+            pprint(form)
+            return
+
+        PLAYER_LIMIT = 20
+
+        input_conf = params[0].upper()
+        input_pos = params[1].upper()
+
+        report_title = '{} Top {} Starters'.format(input_conf, input_pos)
+        sheets_values = '{}-{}!A1:G{}'.format(input_conf, input_pos, PLAYER_LIMIT)
+        
+        sheet_id = '1P8HcDL-aPLeJktgp7CDJqbw-sj-ws9UwifDmXcw56K8'
+        sheets_url = 'https://sheets.googleapis.com/v4/spreadsheets/{}/values/{}?key=AIzaSyD59KmdlMqgYpUcakIonO-yjaeg55D60hY'.format(sheet_id, sheets_values)
+
+        # First call the Google Sheets API to retrieve our graduating player data
+        r = requests.get(sheets_url)
+        raw_json = r.json()
+        results = raw_json['values']
+        fields = []
+         
+        col_gap = '    '
+        count = 0
+        for rank,player,logo,abbrv,pos,pts,gs in results:
+            if (count == 0):
+                field_player = {
+                        'title': ('{}       {}'.format('RK', 'PLAYER')),
+                        'short': 'true'
+                }
+
+                field_stats = {
+                        'title': '{}    {}    {}'.format('TM', 'GS', 'POINTS'),
+                        'short': 'true'
+                }
+            else:
+                field_player = {
+                        'value': ('`#{:>2}`    {}'.format(rank, player)),
+                        'short': 'true'
+                }
+                field_stats = {
+                        'value': ('{}    `{:>2}`    {}'.format(logo, gs, pts)),
+                        'short': 'true'
+                }
+            fields.append(field_player)
+            fields.append(field_stats)
+            count += 1
+         
+        title_text = ':ncff: {}'.format(report_title)
+        attachments = [
+            {
+                'fallback': ':ncff: Top  Players',
+                'title': title_text,
+                'fields': fields,
+                'mrkdwn_in': ['fields']
+            }
+        ]
+        
+        msg_text = '<@{}>, here you go!'.format(user_id)
+        json_body = {
+            'response_type': 'in_channel',
+            'text': msg_text, 
+            'attachments': attachments
+        }
+        
+        r = requests.post(url, json = json_body)
+        print('User {} requested report for "{}" in channel {}'.format(user_name, report_title, channel_name))
+        pprint(form)
+
+    thread = Thread(target=delayed_response, kwargs={'form': request.form})
+    thread.start()
+
+    return '',200
 
 if __name__ == '__main__':
     # This is used when running locally only. When deploying to Google App
