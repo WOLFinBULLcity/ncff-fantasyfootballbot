@@ -23,6 +23,25 @@ def pos_list():
     return ['QB','RB','TE','WR']
 
 
+@app.route('/subscribed_event', methods = ['GET','POST'])
+def subscribed_event():
+    """Receives and responds to various event subscriptions"""
+    pprint(request)
+    raw_json = request.json 
+    form = json.dumps(raw_json)
+   
+    pprint(form)
+    pprint(raw_json)
+
+    event_type = form.get('type')
+
+    print("Received event type {}. Challenge = {}".format(event_type, form.get('challenge')))
+    if event_type == 'url_verification':
+        """This is a verification event that we need to respond to with the provided challenge."""
+        challenge = form.get('challenge')
+        return challenge, 200
+
+
 @app.route('/top25', methods = ['GET','POST'])
 def top25():
     """Posts top 25 rankings"""
