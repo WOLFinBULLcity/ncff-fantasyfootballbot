@@ -1,7 +1,7 @@
 import json
 import requests
 
-# [START gae_python37_app]
+# [START gae_python38_app]
 from flask import Flask, Response, request, jsonify
 from pprint import pprint
 from threading import Thread
@@ -94,7 +94,7 @@ def top25():
         fields = []
 
         count = 0
-        for rank, team, abbrv, record, score, delta, logo in results:
+        for rank, _team, abbrv, _record, _score, delta, logo in results:
             if count == 0:
                 field_rank = {
                     'title': ('{} {}'.format('RK'.ljust(11), 'TEAM'.ljust(24))),
@@ -107,7 +107,6 @@ def top25():
             else:
                 rk_space = ' ' if int(rank) < 10 else ''
                 bold_rank = '`#' + rk_space + rank + '`'
-                team_display = logo + ' ' + abbrv.ljust(6)
                 abbrv_display = abbrv.ljust(6)
                 field_rank = {
                     'value': ('{} {} {}'.format(
@@ -223,8 +222,8 @@ def grads():
                 fields.append(field_player)
                 fields.append(field_count)
                 count += 1
-        else:
-            for conference, div, logo, team, pos, player in results:
+        else: 
+            for _conference, _div, logo, team, pos, player in results:
                 if count == 0:
                     field_team = {
                         'title': 'TEAM',
@@ -341,8 +340,8 @@ def top_starters():
         results = raw_json['values']
         fields = []
 
-        col_gap = '    '
         count = 0
+        # pylint: disable=unused-variable
         for rank, player, logo, abbrv, pos, pts, gs in results:
             if count == 0:
                 field_player = {
